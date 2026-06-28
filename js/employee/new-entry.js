@@ -169,11 +169,14 @@ function updateTotals() {
     const subtotal = selectedServices.reduce((sum, service) => {
         return sum + (service.price * service.quantity);
     }, 0);
-    
+
+    const { subtotalExclVat, vatAmount } = computeVAT(subtotal);
     const tips = parseFloat(document.getElementById('tips').value) || 0;
     const grandTotal = subtotal + tips;
-    
+
     document.getElementById('subtotal').textContent = formatCurrency(subtotal);
+    document.getElementById('displaySubtotalExclVat').textContent = formatCurrency(subtotalExclVat);
+    document.getElementById('displayVatAmount').textContent = formatCurrency(vatAmount);
     document.getElementById('displaySubtotal').textContent = formatCurrency(subtotal);
     document.getElementById('displayTips').textContent = formatCurrency(tips);
     document.getElementById('grandTotal').textContent = formatCurrency(grandTotal);
@@ -217,13 +220,14 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
     const subtotal = selectedServices.reduce((sum, service) => {
         return sum + (service.price * service.quantity);
     }, 0);
+    const { subtotalExclVat, vatAmount } = computeVAT(subtotal);
     const total = subtotal + tips;
-    
+
     try {
         // Create transaction with explicit GST time converted to UTC
         // This ensures the transaction_date stored in DB represents the correct GST time
         const transactionDateUTC = getCurrentGSTAsUTC();
-        
+
         const { data: transaction, error: transactionError } = await window.supabaseClient
             .from('transactions')
             .insert([
@@ -231,6 +235,8 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
                     employee_id: employeeId,
                     payment_method: paymentMethod,
                     subtotal: subtotal,
+                    subtotal_excl_vat: subtotalExclVat,
+                    vat_amount: vatAmount,
                     tips: tips,
                     total: total,
                     transaction_date: transactionDateUTC  // Explicitly set GST time as UTC

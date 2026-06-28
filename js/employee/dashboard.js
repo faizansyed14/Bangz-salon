@@ -224,7 +224,9 @@ async function loadTodayData() {
 function updateTransactionsTable(transactions) {
     const tbody = document.getElementById('transactionsTable');
     const showEmployeeCol = !isStylistOnly;
-    const colCount = showEmployeeCol ? 7 : 5; // Adjusted for Actions col and Employee col
+    // Base cols: Time, Service, Payment, Tips, ExclVAT, VAT, Total = 7
+    // +1 for Employee col (managers), +1 for Actions col (managers)
+    const colCount = showEmployeeCol ? 9 : 7;
 
     if (transactions.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions today</td></tr>`;
@@ -247,6 +249,7 @@ function updateTransactionsTable(transactions) {
                 transactionTips > 0
                     ? `<div style="color: var(--success); font-weight: 600;">${formatCurrency(transactionTips)}</div>`
                     : '-';
+            const { subtotalExclVat, vatAmount } = computeVAT(transaction.subtotal);
 
             const employeeCell = showEmployeeCol ? `<td>${employeeName}</td>` : '';
 
@@ -262,6 +265,8 @@ function updateTransactionsTable(transactions) {
                 ${employeeCell}
                 <td>${paymentBadge}</td>
                 <td>${tipsDisplay}</td>
+                <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(subtotalExclVat)}</td>
+                <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(vatAmount)}</td>
                 <td><strong>${formatCurrency(transaction.total)}</strong></td>
                 ${actionsCell}
             </tr>

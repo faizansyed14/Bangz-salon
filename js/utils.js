@@ -172,6 +172,20 @@ function formatCurrency(amount) {
 }
 
 /**
+ * Compute 5% VAT breakdown from a VAT-inclusive subtotal.
+ * Service prices are VAT-inclusive, so:
+ *   subtotalExclVat = subtotal / 1.05
+ *   vatAmount       = subtotal - subtotalExclVat
+ * Tips are NOT subject to VAT.
+ */
+function computeVAT(subtotal) {
+  const sub = parseFloat(subtotal) || 0;
+  const exclVat = Math.round((sub / 1.05) * 100) / 100;
+  const vatAmt = Math.round((sub - exclVat) * 100) / 100;
+  return { subtotalExclVat: exclVat, vatAmount: vatAmt };
+}
+
+/**
  * Show toast notification
  */
 function showToast(message, type = 'success') {

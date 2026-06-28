@@ -24,7 +24,7 @@ function applyEmployeeScope(query) {
 
 function buildStylistTransactionRows(transactions) {
     if (!transactions.length) {
-        return '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions</td></tr>';
+        return '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions</td></tr>';
     }
     return transactions
         .map((transaction) => {
@@ -42,10 +42,13 @@ function buildStylistTransactionRows(transactions) {
                     ? `<div style="color: var(--success); font-weight: 600;">${formatCurrency(transactionTips)}</div>`
                     : '-';
             const sub = parseFloat(transaction.subtotal || 0);
+            const { subtotalExclVat, vatAmount } = computeVAT(sub);
             return `
             <tr>
                 <td>${formatTime(transaction.transaction_date)}</td>
                 <td>${serviceNames}</td>
+                <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(subtotalExclVat)}</td>
+                <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(vatAmount)}</td>
                 <td><strong>${formatCurrency(sub)}</strong></td>
                 <td>${paymentBadge}</td>
                 <td>${tipsDisplay}</td>
@@ -71,11 +74,21 @@ function buildStylistDayDetailsHtml(transactions) {
         }
     });
 
+    const { subtotalExclVat: totalExclVat, vatAmount: totalVatAmt } = computeVAT(totalSales);
+
     return `
         <div class="summary-grid" style="margin-bottom: 24px;">
             <div class="summary-card">
-                <div class="summary-card-label">Your sales (excl. tips)</div>
+                <div class="summary-card-label">Your sales (incl. VAT)</div>
                 <div class="summary-card-value">${formatCurrency(totalSales)}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-label">Amount excl. VAT</div>
+                <div class="summary-card-value" style="color: var(--text-secondary);">${formatCurrency(totalExclVat)}</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-card-label">VAT (5%)</div>
+                <div class="summary-card-value" style="color: var(--text-secondary);">${formatCurrency(totalVatAmt)}</div>
             </div>
             <div class="summary-card">
                 <div class="summary-card-label">Your tips</div>
@@ -101,6 +114,8 @@ function buildStylistDayDetailsHtml(transactions) {
                     <tr>
                         <th>Time</th>
                         <th>Services</th>
+                        <th>Excl. VAT</th>
+                        <th>VAT (5%)</th>
                         <th>Service sales</th>
                         <th>Payment</th>
                         <th>Tips</th>

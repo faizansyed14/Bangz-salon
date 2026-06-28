@@ -482,25 +482,26 @@ async function updateEmployeeTargets(dayTransactions) {
 // Update transactions table
 function updateTransactionsTable(transactions) {
     const tbody = document.getElementById('transactionsTable');
-    
+
     if (transactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions today</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions today</td></tr>';
         return;
     }
-    
+
     tbody.innerHTML = transactions.map(transaction => {
         const employeeName = transaction.employees?.name || 'Unknown';
         const serviceNames = transaction.transaction_items
             ?.map(item => `${item.service_name}${item.quantity > 1 ? ` (x${item.quantity})` : ''}`)
             .join(', ') || 'N/A';
-        const paymentBadge = transaction.payment_method === 'cash' 
+        const paymentBadge = transaction.payment_method === 'cash'
             ? '<span class="badge badge-cash">Cash</span>'
             : '<span class="badge badge-card">Card</span>';
         const transactionTips = parseFloat(transaction.tips || 0);
-        const tipsDisplay = transactionTips > 0 
+        const tipsDisplay = transactionTips > 0
             ? `<div style="color: var(--success); font-weight: 600;">${formatCurrency(transactionTips)}</div>`
             : '-';
-        
+        const { subtotalExclVat, vatAmount } = computeVAT(transaction.subtotal);
+
         return `
             <tr>
                 <td>${formatTime(transaction.transaction_date)}</td>
@@ -508,6 +509,8 @@ function updateTransactionsTable(transactions) {
                 <td>${employeeName}</td>
                 <td>${paymentBadge}</td>
                 <td>${tipsDisplay}</td>
+                <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(subtotalExclVat)}</td>
+                <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(vatAmount)}</td>
                 <td><strong>${formatCurrency(transaction.total)}</strong></td>
                 <td>
                     <button class="btn btn-secondary btn-sm" onclick="deleteTransaction('${transaction.id}')" style="background-color: #ef4444; color: white; border: none;">Delete</button>

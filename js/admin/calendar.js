@@ -229,12 +229,23 @@ async function loadDateDetails(date) {
             employeeStats[employeeName].tips += parseFloat(transaction.tips || 0);
         });
         
+        // VAT totals for the day
+        const { subtotalExclVat: dayExclVat, vatAmount: dayVatAmt } = computeVAT(totalSales);
+
         // Display details
         const detailsHTML = `
             <div class="summary-grid" style="margin-bottom: 24px;">
                 <div class="summary-card">
-                    <div class="summary-card-label">Total Sales (excl. tips)</div>
+                    <div class="summary-card-label">Total Sales (incl. VAT)</div>
                     <div class="summary-card-value">${formatCurrency(totalSales)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Amount excl. VAT</div>
+                    <div class="summary-card-value" style="color: var(--text-secondary);">${formatCurrency(dayExclVat)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">VAT (5%)</div>
+                    <div class="summary-card-value" style="color: var(--text-secondary);">${formatCurrency(dayVatAmt)}</div>
                 </div>
                 <div class="summary-card">
                     <div class="summary-card-label">Employee Tips</div>
@@ -265,9 +276,11 @@ async function loadDateDetails(date) {
                             <th>Employee Name</th>
                             <th>Payment Method</th>
                             <th>Services/Products</th>
-                            <th>Subtotal</th>
+                            <th>Excl. VAT</th>
+                            <th>VAT (5%)</th>
+                            <th>Total (incl. VAT)</th>
                             <th>Tips</th>
-                            <th>Total</th>
+                            <th>Grand Total</th>
                             <th>Action</th>
                         </tr>
                     </thead>
@@ -288,9 +301,7 @@ async function loadDateDetails(date) {
                                         return `${item.service_name || 'Item'}${qtyLabel}`;
                                     }).join('; ')
                                     : 'N/A';
-                                const subtotalDisplay = formatCurrencyForCSV(transaction.subtotal);
-                                const tipsDisplay = formatCurrencyForCSV(tips);
-                                const totalDisplay = formatCurrencyForCSV(transaction.total);
+                                const { subtotalExclVat, vatAmount } = computeVAT(transaction.subtotal);
 
                                 return `
                                     <tr>
@@ -300,9 +311,11 @@ async function loadDateDetails(date) {
                                         <td><strong>${employeeName}</strong></td>
                                         <td>${paymentMethod || 'N/A'}</td>
                                         <td style="min-width: 280px; white-space: normal; word-break: break-word;">${servicesText}</td>
-                                        <td>${subtotalDisplay}</td>
-                                        <td>${tipsDisplay}</td>
-                                        <td><strong>${totalDisplay}</strong></td>
+                                        <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(subtotalExclVat)}</td>
+                                        <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(vatAmount)}</td>
+                                        <td>${formatCurrency(parseFloat(transaction.subtotal || 0))}</td>
+                                        <td>${tips > 0 ? formatCurrency(tips) : '-'}</td>
+                                        <td><strong>${formatCurrency(transaction.total)}</strong></td>
                                         <td>
                                             <button
                                                 class="btn btn-secondary btn-sm"
@@ -315,7 +328,7 @@ async function loadDateDetails(date) {
                                     </tr>
                                 `;
                             }).join('')
-                            || '<tr><td colspan="10" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions on this date</td></tr>'
+                            || '<tr><td colspan="12" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions on this date</td></tr>'
                         }
                     </tbody>
                 </table>
@@ -484,13 +497,24 @@ async function showMonthlyView() {
         
         // Update details title
         document.getElementById('dateDetailsTitle').textContent = `Month: ${getMonthName(monthIndex)} ${year}`;
-        
+
+        // VAT totals for the month
+        const { subtotalExclVat: monthExclVat, vatAmount: monthVatAmt } = computeVAT(totalSales);
+
         // Display monthly details
         const detailsHTML = `
             <div class="summary-grid" style="margin-bottom: 24px;">
                 <div class="summary-card">
-                    <div class="summary-card-label">Total Sales (excl. tips)</div>
+                    <div class="summary-card-label">Total Sales (incl. VAT)</div>
                     <div class="summary-card-value">${formatCurrency(totalSales)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">Amount excl. VAT</div>
+                    <div class="summary-card-value" style="color: var(--text-secondary);">${formatCurrency(monthExclVat)}</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-card-label">VAT (5%)</div>
+                    <div class="summary-card-value" style="color: var(--text-secondary);">${formatCurrency(monthVatAmt)}</div>
                 </div>
                 <div class="summary-card">
                     <div class="summary-card-label">Employee Tips</div>
@@ -509,7 +533,7 @@ async function showMonthlyView() {
                     <div class="summary-card-value">${transactions.length}</div>
                 </div>
             </div>
-            
+
             <h3 style="margin-bottom: 16px;">Employee Performance</h3>
             <div class="table-container">
                 <table>
@@ -660,9 +684,12 @@ async function downloadMonthlyReport() {
         csvContent += '\n';
         
         // Summary Section
+        const { subtotalExclVat: csvExclVat, vatAmount: csvVatAmt } = computeVAT(data.totalSales);
         csvContent += 'SUMMARY\n';
         csvContent += '========\n';
-        csvContent += `Total Sales (excl. tips),${formatCurrencyForCSV(data.totalSales)}\n`;
+        csvContent += `Total Sales (incl. VAT),${formatCurrencyForCSV(data.totalSales)}\n`;
+        csvContent += `Amount Excl. VAT,${formatCurrencyForCSV(csvExclVat)}\n`;
+        csvContent += `VAT (5%),${formatCurrencyForCSV(csvVatAmt)}\n`;
         csvContent += `Cash Total,${formatCurrencyForCSV(data.cashTotal)}\n`;
         csvContent += `Card Total,${formatCurrencyForCSV(data.cardTotal)}\n`;
         csvContent += `Employee Tips,${formatCurrencyForCSV(data.employeeTips)}\n`;
@@ -685,27 +712,29 @@ async function downloadMonthlyReport() {
         // Detailed Transactions Section
         csvContent += 'DETAILED TRANSACTIONS\n';
         csvContent += '=====================\n';
-        csvContent += 'Date,Time,Transaction ID,Employee Name,Payment Method,Services/Products,Subtotal,Tips,Total\n';
-        
+        csvContent += 'Date,Time,Transaction ID,Employee Name,Payment Method,Services/Products,Amount Excl. VAT,VAT (5%),Subtotal (incl. VAT),Tips,Grand Total\n';
+
         // Sort transactions by date
         const sortedTransactions = [...data.transactions].sort((a, b) => {
             return new Date(a.transaction_date) - new Date(b.transaction_date);
         });
-        
+
         sortedTransactions.forEach(transaction => {
             const gstDate = getGSTDate(new Date(transaction.transaction_date));
             const dateStr = formatDate(gstDate);
             const timeStr = formatTime(gstDate);
             const employeeName = transaction.employees?.name || 'Unknown';
             const paymentMethod = transaction.payment_method.toUpperCase();
-            
+
             // Get transaction items
             const items = itemsByTransaction[transaction.id] || [];
-            const servicesList = items.map(item => 
+            const servicesList = items.map(item =>
                 `${item.service_name}${item.quantity > 1 ? ` (x${item.quantity})` : ''}`
             ).join('; ') || 'N/A';
-            
-            csvContent += `"${dateStr}","${timeStr}","${transaction.id}","${employeeName}","${paymentMethod}","${servicesList}",${formatCurrencyForCSV(transaction.subtotal)},${formatCurrencyForCSV(transaction.tips || 0)},${formatCurrencyForCSV(transaction.total)}\n`;
+
+            const { subtotalExclVat: txExclVat, vatAmount: txVatAmt } = computeVAT(transaction.subtotal);
+
+            csvContent += `"${dateStr}","${timeStr}","${transaction.id}","${employeeName}","${paymentMethod}","${servicesList}",${formatCurrencyForCSV(txExclVat)},${formatCurrencyForCSV(txVatAmt)},${formatCurrencyForCSV(transaction.subtotal)},${formatCurrencyForCSV(transaction.tips || 0)},${formatCurrencyForCSV(transaction.total)}\n`;
         });
         
         // Create and download CSV file
