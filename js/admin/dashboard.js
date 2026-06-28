@@ -8,6 +8,7 @@ if (!user) {
 }
 
 let refreshInterval;
+const adminTransactionMap = {};
 
 // Load monthly data
 async function loadMonthlyData() {
@@ -250,7 +251,8 @@ async function loadTodayData() {
             .select(`
                 *,
                 employees(name),
-                transaction_items(service_name, price, quantity)
+                transaction_items(service_name, price, quantity),
+                customers(id, name, whatsapp_number)
             `)
             .gte('transaction_date', startISO)
             .lte('transaction_date', endISO)
@@ -483,6 +485,9 @@ async function updateEmployeeTargets(dayTransactions) {
 function updateTransactionsTable(transactions) {
     const tbody = document.getElementById('transactionsTable');
 
+    Object.keys(adminTransactionMap).forEach(k => delete adminTransactionMap[k]);
+    transactions.forEach(tx => { adminTransactionMap[tx.id] = tx; });
+
     if (transactions.length === 0) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions today</td></tr>';
         return;
@@ -501,6 +506,10 @@ function updateTransactionsTable(transactions) {
             ? `<div style="color: var(--success); font-weight: 600;">${formatCurrency(transactionTips)}</div>`
             : '-';
         const { subtotalExclVat, vatAmount } = computeVAT(transaction.subtotal);
+        const hasCustomer = !!transaction.customers?.whatsapp_number;
+        const waBtn = hasCustomer
+            ? `<button class="btn btn-secondary btn-sm" onclick="sendWhatsAppFromAdminDashboard('${transaction.id}')" style="background:#25d366; color:#fff; border:none; margin-left:6px;" title="Send receipt on WhatsApp">📱</button>`
+            : '';
 
         return `
             <tr>
@@ -513,7 +522,7 @@ function updateTransactionsTable(transactions) {
                 <td style="color: var(--text-secondary); font-size: 13px;">${formatCurrency(vatAmount)}</td>
                 <td><strong>${formatCurrency(transaction.total)}</strong></td>
                 <td>
-                    <button class="btn btn-secondary btn-sm" onclick="deleteTransaction('${transaction.id}')" style="background-color: #ef4444; color: white; border: none;">Delete</button>
+                    <button class="btn btn-secondary btn-sm" onclick="deleteTransaction('${transaction.id}')" style="background-color: #ef4444; color: white; border: none;">Delete</button>${waBtn}
                 </td>
             </tr>
         `;
@@ -547,6 +556,32 @@ async function deleteTransaction(transactionId) {
 
 // Make deleteTransaction available globally
 window.deleteTransaction = deleteTransaction;
+
+function sendWhatsAppFromAdminDashboard(txId) {
+    const tx = adminTransactionMap[txId];
+    if (!tx || !tx.customers?.whatsapp_number) {
+        showToast('No customer WhatsApp number found for this transaction.', 'error');
+        return;
+    }
+
+    const customer = tx.customers;
+    const employeeName = tx.employees?.name || 'Staff';
+    const receiptText = buildWhatsAppReceipt({
+        customerName: customer.name,
+        employeeName,
+        transactionDate: tx.transaction_date,
+        items: tx.transaction_items || [],
+        subtotal: tx.subtotal,
+        tips: tx.tips,
+        total: tx.total,
+        paymentMethod: tx.payment_method
+    });
+
+    const url = `https://wa.me/${customer.whatsapp_number}?text=${encodeURIComponent(receiptText)}`;
+    window.open(url, '_blank');
+}
+
+window.sendWhatsAppFromAdminDashboard = sendWhatsAppFromAdminDashboard;
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {

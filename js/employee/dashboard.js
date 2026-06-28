@@ -13,6 +13,7 @@ if (isStylistOnly && !user.employee_id) {
 }
 
 let refreshInterval;
+const dashboardTransactionMap = {};
 
 function applyEmployeeScope(query) {
     if (!isStylistOnly) return query;
@@ -116,7 +117,8 @@ async function loadTodayData() {
                 `
                 *,
                 employees(name),
-                transaction_items(service_name, price, quantity)
+                transaction_items(service_name, price, quantity),
+                customers(id, name, whatsapp_number)
             `
             )
             .gte('transaction_date', startOfDay.toISOString())
@@ -228,6 +230,10 @@ function updateTransactionsTable(transactions) {
     // +1 for Employee col (managers), +1 for Actions col (managers)
     const colCount = showEmployeeCol ? 9 : 7;
 
+    // Rebuild the lookup map so sendWhatsAppFromDashboard can find full transaction data
+    Object.keys(dashboardTransactionMap).forEach(k => delete dashboardTransactionMap[k]);
+    transactions.forEach(tx => { dashboardTransactionMap[tx.id] = tx; });
+
     if (transactions.length === 0) {
         tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align: center; padding: 40px; color: var(--text-secondary);">No transactions today</td></tr>`;
         return;
@@ -253,10 +259,17 @@ function updateTransactionsTable(transactions) {
 
             const employeeCell = showEmployeeCol ? `<td>${employeeName}</td>` : '';
 
-            const actionsCell = !isStylistOnly ? `
+            let actionsCell = '';
+            if (!isStylistOnly) {
+                const hasCustomer = !!transaction.customers?.whatsapp_number;
+                const waBtn = hasCustomer
+                    ? `<button class="btn btn-secondary btn-sm" onclick="sendWhatsAppFromDashboard('${transaction.id}')" style="background:#25d366; color:#fff; border:none; margin-left:6px;" title="Send receipt on WhatsApp">📱</button>`
+                    : '';
+                actionsCell = `
                 <td>
-                    <button class="btn btn-secondary btn-sm" onclick="deleteTransaction('${transaction.id}')" style="background-color: #ef4444; color: white; border: none;">Delete</button>
-                </td>` : '';
+                    <button class="btn btn-secondary btn-sm" onclick="deleteTransaction('${transaction.id}')" style="background-color: #ef4444; color: white; border: none;">Delete</button>${waBtn}
+                </td>`;
+            }
 
             return `
             <tr>
@@ -301,6 +314,33 @@ async function deleteTransaction(transactionId) {
 
 // Make deleteTransaction available globally
 window.deleteTransaction = deleteTransaction;
+
+// Send WhatsApp receipt from the dashboard for a transaction that has customer info
+function sendWhatsAppFromDashboard(txId) {
+    const tx = dashboardTransactionMap[txId];
+    if (!tx || !tx.customers?.whatsapp_number) {
+        showToast('No customer WhatsApp number found for this transaction.', 'error');
+        return;
+    }
+
+    const customer = tx.customers;
+    const employeeName = tx.employees?.name || 'Staff';
+    const receiptText = buildWhatsAppReceipt({
+        customerName: customer.name,
+        employeeName,
+        transactionDate: tx.transaction_date,
+        items: tx.transaction_items || [],
+        subtotal: tx.subtotal,
+        tips: tx.tips,
+        total: tx.total,
+        paymentMethod: tx.payment_method
+    });
+
+    const url = `https://wa.me/${customer.whatsapp_number}?text=${encodeURIComponent(receiptText)}`;
+    window.open(url, '_blank');
+}
+
+window.sendWhatsAppFromDashboard = sendWhatsAppFromDashboard;
 
 document.addEventListener('DOMContentLoaded', () => {
     setupStaffNavForRole(user);

@@ -199,88 +199,121 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
     const employeeId = document.getElementById('employeeSelect').value;
     const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value;
     const tips = parseFloat(document.getElementById('tips').value) || 0;
-    
-    // Validation
+    const customerName = (document.getElementById('customerName')?.value || '').trim();
+    const customerWhatsappRaw = (document.getElementById('customerWhatsapp')?.value || '').trim();
+
     if (!employeeId) {
         showToast('Please select an employee', 'error');
         return;
     }
-    
+
     if (selectedServices.length === 0) {
         showToast('Please select at least one service', 'error');
         return;
     }
-    
+
     if (!paymentMethod) {
         showToast('Please select a payment method', 'error');
         return;
     }
-    
-    // Calculate totals
-    const subtotal = selectedServices.reduce((sum, service) => {
-        return sum + (service.price * service.quantity);
-    }, 0);
+
+    const subtotal = selectedServices.reduce((sum, s) => sum + s.price * s.quantity, 0);
     const { subtotalExclVat, vatAmount } = computeVAT(subtotal);
     const total = subtotal + tips;
 
+    if (submitBtn) submitBtn.disabled = true;
+    showSubmitLoadingOverlay();
+
     try {
-        // Create transaction with explicit GST time converted to UTC
-        // This ensures the transaction_date stored in DB represents the correct GST time
         const transactionDateUTC = getCurrentGSTAsUTC();
 
         const { data: transaction, error: transactionError } = await window.supabaseClient
             .from('transactions')
-            .insert([
-                {
-                    employee_id: employeeId,
-                    payment_method: paymentMethod,
-                    subtotal: subtotal,
-                    subtotal_excl_vat: subtotalExclVat,
-                    vat_amount: vatAmount,
-                    tips: tips,
-                    total: total,
-                    transaction_date: transactionDateUTC  // Explicitly set GST time as UTC
-                }
-            ])
+            .insert([{
+                employee_id: employeeId,
+                payment_method: paymentMethod,
+                subtotal,
+                subtotal_excl_vat: subtotalExclVat,
+                vat_amount: vatAmount,
+                tips,
+                total,
+                transaction_date: transactionDateUTC
+            }])
             .select()
             .single();
-        
-        // Log for debugging
-        if (transaction) {
-            const gstTime = formatTime(new Date(transaction.transaction_date));
-            const currentGST = formatTime(new Date());
-            console.log('Transaction created:');
-            console.log('  - Set transaction_date (UTC):', transactionDateUTC);
-            console.log('  - Stored in DB (UTC):', transaction.transaction_date);
-            console.log('  - Displayed GST time:', gstTime);
-            console.log('  - Current GST time:', currentGST);
-            console.log('  - Match:', gstTime === currentGST ? 'YES ✓' : 'NO ✗');
-        }
-        
+
         if (transactionError) throw transactionError;
-        
-        // Create transaction items
-        const transactionItems = selectedServices.map(service => ({
+
+        const transactionItems = selectedServices.map(s => ({
             transaction_id: transaction.id,
-            service_id: service.id,
-            service_name: service.name,
-            price: service.price,
-            quantity: service.quantity
+            service_id: s.id,
+            service_name: s.name,
+            price: s.price,
+            quantity: s.quantity
         }));
-        
+
         const { error: itemsError } = await window.supabaseClient
             .from('transaction_items')
             .insert(transactionItems);
-        
+
         if (itemsError) throw itemsError;
 
-        showToast('Transaction saved.', 'success');
-        if (submitBtn) submitBtn.disabled = true;
-        showSubmitLoadingOverlay();
+        // Attempt customer save + WhatsApp receipt if info provided
+        let showWhatsApp = false;
+        let normalizedPhone = '';
 
-        setTimeout(() => {
-            window.location.href = '/employee/dashboard.html';
-        }, 1100);
+        if (customerName && customerWhatsappRaw) {
+            normalizedPhone = normalizeWhatsAppNumber(customerWhatsappRaw);
+            if (normalizedPhone.length >= 7) {
+                try {
+                    const { data: customer, error: customerError } = await window.supabaseClient
+                        .from('customers')
+                        .upsert(
+                            { name: customerName, whatsapp_number: normalizedPhone, last_visited_at: new Date().toISOString() },
+                            { onConflict: 'whatsapp_number' }
+                        )
+                        .select()
+                        .single();
+
+                    if (!customerError && customer) {
+                        await window.supabaseClient
+                            .from('transactions')
+                            .update({ customer_id: customer.id })
+                            .eq('id', transaction.id);
+
+                        showWhatsApp = true;
+                    }
+                } catch (customerErr) {
+                    console.warn('Customer save failed (non-fatal):', customerErr);
+                }
+            }
+        }
+
+        if (showWhatsApp) {
+            const { data: empData } = await window.supabaseClient
+                .from('employees')
+                .select('name')
+                .eq('id', employeeId)
+                .single();
+            const employeeName = empData?.name || 'Staff';
+
+            const receiptText = buildWhatsAppReceipt({
+                customerName,
+                employeeName,
+                transactionDate: transaction.transaction_date,
+                items: selectedServices,
+                subtotal,
+                tips,
+                total,
+                paymentMethod
+            });
+
+            showWhatsappModal(customerName, normalizedPhone, receiptText);
+        } else {
+            showToast('Transaction saved.', 'success');
+            setTimeout(() => { window.location.href = '/employee/dashboard.html'; }, 1100);
+        }
+
     } catch (error) {
         console.error('Error creating transaction:', error);
         hideSubmitLoadingOverlay();
@@ -288,6 +321,39 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
         showToast('Error creating transaction: ' + (error.message || 'Unknown error'), 'error');
     }
 });
+
+function showWhatsappModal(customerName, phone, receiptText) {
+    hideSubmitLoadingOverlay();
+
+    const modal = document.getElementById('whatsappReceiptModal');
+    if (!modal) {
+        window.location.href = '/employee/dashboard.html';
+        return;
+    }
+
+    const nameEl = document.getElementById('receiptCustomerName');
+    const previewEl = document.getElementById('receiptPreviewBox');
+    const sendBtn = document.getElementById('sendWhatsappBtn');
+    const skipBtn = document.getElementById('skipWhatsappBtn');
+
+    if (nameEl) nameEl.textContent = customerName;
+    if (previewEl) previewEl.textContent = receiptText.replace(/[*_]/g, '');
+
+    modal.style.display = 'flex';
+
+    const redirectDashboard = () => {
+        modal.style.display = 'none';
+        window.location.href = '/employee/dashboard.html';
+    };
+
+    sendBtn.onclick = () => {
+        const url = `https://wa.me/${phone}?text=${encodeURIComponent(receiptText)}`;
+        window.open(url, '_blank');
+        setTimeout(redirectDashboard, 600);
+    };
+
+    skipBtn.onclick = redirectDashboard;
+}
 
 // Make toggleService available globally
 window.toggleService = toggleService;

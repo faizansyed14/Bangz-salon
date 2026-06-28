@@ -186,6 +186,65 @@ function computeVAT(subtotal) {
 }
 
 /**
+ * Normalise a phone number to the E.164 digits-only format used by wa.me.
+ * Handles UAE local numbers (starting with 0 → 971) and international formats.
+ */
+function normalizeWhatsAppNumber(phone) {
+  let n = String(phone || '').replace(/[\s\-\(\)\.]/g, '');
+  if (n.startsWith('+')) n = n.slice(1);
+  if (n.startsWith('00')) n = n.slice(2);
+  // UAE local: 05XXXXXXXX → 97105XXXXXXXX
+  if (n.startsWith('0') && n.length <= 10) n = '971' + n.slice(1);
+  return n;
+}
+
+/**
+ * Build a formatted WhatsApp receipt text string (with VAT breakdown).
+ * items: array of { service_name|name, price, quantity }
+ * Returns plain text with WhatsApp markdown (*bold*, _italic_).
+ */
+function buildWhatsAppReceipt({ customerName, employeeName, transactionDate, items, subtotal, tips, total, paymentMethod }) {
+  const { subtotalExclVat, vatAmount } = computeVAT(subtotal);
+  const dateStr = formatDateTime(new Date(transactionDate));
+  const payStr = (paymentMethod || '').toUpperCase();
+
+  const serviceLines = (items || []).map(item => {
+    const qty = parseInt(item.quantity || 1);
+    const itemName = item.service_name || item.name || 'Service';
+    const lineTotal = parseFloat(item.price || 0) * qty;
+    const qtyLabel = qty > 1 ? ` ×${qty}` : '';
+    return `• ${itemName}${qtyLabel}: ${formatCurrency(lineTotal)}`;
+  });
+
+  const lines = [
+    '🧭 *BANGZSALON*',
+    '─────────────────────',
+    `Customer: *${customerName}*`,
+    `Date: ${dateStr}`,
+    `Employee: ${employeeName}`,
+    '─────────────────────',
+    '*Services:*',
+    ...serviceLines,
+    '─────────────────────',
+    `Amount excl. VAT:  ${formatCurrency(subtotalExclVat)}`,
+    `VAT (5%):          ${formatCurrency(vatAmount)}`,
+    `Subtotal (VAT inc): ${formatCurrency(parseFloat(subtotal))}`,
+  ];
+
+  if (parseFloat(tips) > 0) {
+    lines.push(`Tips:              ${formatCurrency(parseFloat(tips))}`);
+  }
+
+  lines.push('─────────────────────');
+  lines.push(`*TOTAL: ${formatCurrency(total)}*`);
+  lines.push(`Payment: ${payStr}`);
+  lines.push('─────────────────────');
+  lines.push('_Thank you for visiting BangzSalon!_ 🙏');
+
+  return lines.join('\n');
+}
+
+/**
  * Show toast notification
  */
 function showToast(message, type = 'success') {
