@@ -225,6 +225,34 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
     showSubmitLoadingOverlay();
 
     try {
+        // Upsert customer BEFORE inserting the transaction so we can include
+        // customer_id directly in the INSERT (avoids a separate UPDATE that RLS
+        // on transactions would silently block for employee accounts).
+        let customerId = null;
+        if (customerName && customerWhatsappRaw) {
+            const normalizedPhone = normalizeWhatsAppNumber(customerWhatsappRaw);
+            if (normalizedPhone.length >= 7) {
+                try {
+                    const { data: customer, error: customerError } = await window.supabaseClient
+                        .from('customers')
+                        .upsert(
+                            { name: customerName, whatsapp_number: normalizedPhone, last_visited_at: new Date().toISOString() },
+                            { onConflict: 'whatsapp_number' }
+                        )
+                        .select('id')
+                        .single();
+
+                    if (!customerError && customer) {
+                        customerId = customer.id;
+                    } else if (customerError) {
+                        console.warn('Customer upsert error (non-fatal):', customerError);
+                    }
+                } catch (customerErr) {
+                    console.warn('Customer save failed (non-fatal):', customerErr);
+                }
+            }
+        }
+
         const transactionDateUTC = getCurrentGSTAsUTC();
 
         const { data: transaction, error: transactionError } = await window.supabaseClient
@@ -237,7 +265,8 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
                 vat_amount: vatAmount,
                 tips,
                 total,
-                transaction_date: transactionDateUTC
+                transaction_date: transactionDateUTC,
+                ...(customerId ? { customer_id: customerId } : {})
             }])
             .select()
             .single();
@@ -257,34 +286,6 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
             .insert(transactionItems);
 
         if (itemsError) throw itemsError;
-
-        // Save customer (if provided) and link to this transaction so the
-        // manager can send the WhatsApp receipt later from the WhatsApp page.
-        // This is non-fatal: a failure here never blocks the transaction.
-        if (customerName && customerWhatsappRaw) {
-            const normalizedPhone = normalizeWhatsAppNumber(customerWhatsappRaw);
-            if (normalizedPhone.length >= 7) {
-                try {
-                    const { data: customer, error: customerError } = await window.supabaseClient
-                        .from('customers')
-                        .upsert(
-                            { name: customerName, whatsapp_number: normalizedPhone, last_visited_at: new Date().toISOString() },
-                            { onConflict: 'whatsapp_number' }
-                        )
-                        .select()
-                        .single();
-
-                    if (!customerError && customer) {
-                        await window.supabaseClient
-                            .from('transactions')
-                            .update({ customer_id: customer.id })
-                            .eq('id', transaction.id);
-                    }
-                } catch (customerErr) {
-                    console.warn('Customer save failed (non-fatal):', customerErr);
-                }
-            }
-        }
 
         showToast('Transaction saved.', 'success');
         setTimeout(() => { window.location.href = '/employee/dashboard.html'; }, 1100);
