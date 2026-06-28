@@ -137,28 +137,6 @@
         </div>
     </div>
 
-    <!-- WhatsApp receipt modal — shown after a transaction is saved with customer info -->
-    <div id="whatsappReceiptModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:10000; align-items:center; justify-content:center; padding:16px;">
-        <div style="background:var(--card-bg); border-radius:16px; padding:28px 24px; max-width:480px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 8px 40px rgba(0,0,0,0.3);">
-            <div style="text-align:center; margin-bottom:20px;">
-                <div style="font-size:44px; margin-bottom:8px;">✅</div>
-                <h2 style="margin:0; font-size:20px; color:var(--text-primary);">Transaction Saved!</h2>
-                <p style="margin:8px 0 0; color:var(--text-secondary); font-size:14px;">
-                    Send receipt to <strong id="receiptCustomerName"></strong> on WhatsApp?
-                </p>
-            </div>
-            <div id="receiptPreviewBox" style="background:var(--background); border:1px solid var(--border-color); border-radius:10px; padding:14px 16px; font-family:'Courier New',monospace; font-size:12px; white-space:pre-wrap; max-height:240px; overflow-y:auto; margin-bottom:20px; line-height:1.6; color:var(--text-primary);"></div>
-            <div style="display:flex; gap:12px;">
-                <button id="sendWhatsappBtn" class="btn btn-primary" style="flex:1; background:#25d366; border-color:#25d366; font-size:15px;">
-                    📱 Send on WhatsApp
-                </button>
-                <button id="skipWhatsappBtn" class="btn btn-secondary" style="flex:1; font-size:15px;">
-                    Skip
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script src="../js/supabase-config.js"></script>
     <script src="../js/supabase-client.js"></script>
     <script src="../js/utils.js"></script>

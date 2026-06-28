@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="../js/version.js"></script>
+    <title>WhatsApp Receipts - BangzSalon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/main.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="header-logo-container">
+            <div class="bangzsalon-logo">BangzSalon</div>
+        </div>
+        <nav class="nav">
+            <a href="dashboard.html" class="nav-item">Dashboard</a>
+            <a href="new-entry.html" class="nav-item">New Entry</a>
+            <a href="whatsapp.html" class="nav-item active">WhatsApp</a>
+            <a href="calendar.html" class="nav-item">Calendar</a>
+            <a href="expenses.html" class="nav-item">Expenses</a>
+            <div class="nav-actions">
+                <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()" title="Switch to Dark Mode">🌙</button>
+                <button class="btn btn-secondary btn-block" onclick="clearUser()">Logout</button>
+            </div>
+        </nav>
+        <button class="hamburger" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </header>
+
+    <nav class="nav-mobile">
+        <div class="nav-logo">
+            <div class="bangzsalon-logo" style="font-size: 20px; padding: 0;">BangzSalon</div>
+        </div>
+        <a href="dashboard.html" class="nav-item">Dashboard</a>
+        <a href="new-entry.html" class="nav-item">New Entry</a>
+        <a href="whatsapp.html" class="nav-item active">WhatsApp</a>
+        <a href="calendar.html" class="nav-item">Calendar</a>
+        <a href="expenses.html" class="nav-item">Expenses</a>
+        <div class="nav-actions">
+            <button id="themeToggleMobile" class="theme-toggle" onclick="toggleTheme()" title="Switch to Dark Mode" style="width: 100%; margin-bottom: 8px;">🌙</button>
+            <button class="btn btn-secondary btn-block" onclick="clearUser()">Logout</button>
+        </div>
+    </nav>
+    <div class="nav-overlay"></div>
+
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">WhatsApp Receipts</h2>
+                <span id="lastUpdate" style="color: var(--text-secondary); font-size: 14px;"></span>
+            </div>
+
+            <p style="color: var(--text-secondary); margin-bottom: 16px;">
+                Today's transactions that have a customer's WhatsApp number. Tap
+                <strong>Send Receipt</strong> to open WhatsApp with the receipt pre-filled,
+                then press Send inside WhatsApp. Once sent, the button is locked.
+            </p>
+
+            <div id="readOnlyNote" style="display:none; background: var(--background); border: 1px solid var(--border-color); border-radius: 8px; padding: 12px 14px; margin-bottom: 16px; color: var(--text-secondary); font-size: 14px;">
+                ℹ️ Only managers can send WhatsApp receipts. This list is read-only for your account.
+            </div>
+
+            <div class="table-container" style="max-height: 560px; overflow: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Time</th>
+                            <th>Customer</th>
+                            <th>WhatsApp #</th>
+                            <th>Services</th>
+                            <th>Total (incl. VAT)</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="receiptsTable">
+                        <tr>
+                            <td colspan="6" style="text-align: center; padding: 40px;">
+                                <div class="loading-spinner">
+                                    <div class="spinner"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="../js/supabase-config.js"></script>
+    <script src="../js/supabase-client.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/whatsapp-receipts.js"></script>
+</body>
+</html>

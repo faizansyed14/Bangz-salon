@@ -258,12 +258,11 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
 
         if (itemsError) throw itemsError;
 
-        // Attempt customer save + WhatsApp receipt if info provided
-        let showWhatsApp = false;
-        let normalizedPhone = '';
-
+        // Save customer (if provided) and link to this transaction so the
+        // manager can send the WhatsApp receipt later from the WhatsApp page.
+        // This is non-fatal: a failure here never blocks the transaction.
         if (customerName && customerWhatsappRaw) {
-            normalizedPhone = normalizeWhatsAppNumber(customerWhatsappRaw);
+            const normalizedPhone = normalizeWhatsAppNumber(customerWhatsappRaw);
             if (normalizedPhone.length >= 7) {
                 try {
                     const { data: customer, error: customerError } = await window.supabaseClient
@@ -280,8 +279,6 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
                             .from('transactions')
                             .update({ customer_id: customer.id })
                             .eq('id', transaction.id);
-
-                        showWhatsApp = true;
                     }
                 } catch (customerErr) {
                     console.warn('Customer save failed (non-fatal):', customerErr);
@@ -289,30 +286,8 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
             }
         }
 
-        if (showWhatsApp) {
-            const { data: empData } = await window.supabaseClient
-                .from('employees')
-                .select('name')
-                .eq('id', employeeId)
-                .single();
-            const employeeName = empData?.name || 'Staff';
-
-            const receiptText = buildWhatsAppReceipt({
-                customerName,
-                employeeName,
-                transactionDate: transaction.transaction_date,
-                items: selectedServices,
-                subtotal,
-                tips,
-                total,
-                paymentMethod
-            });
-
-            showWhatsappModal(customerName, normalizedPhone, receiptText);
-        } else {
-            showToast('Transaction saved.', 'success');
-            setTimeout(() => { window.location.href = '/employee/dashboard.html'; }, 1100);
-        }
+        showToast('Transaction saved.', 'success');
+        setTimeout(() => { window.location.href = '/employee/dashboard.html'; }, 1100);
 
     } catch (error) {
         console.error('Error creating transaction:', error);
@@ -321,39 +296,6 @@ document.getElementById('transactionForm').addEventListener('submit', async (e) 
         showToast('Error creating transaction: ' + (error.message || 'Unknown error'), 'error');
     }
 });
-
-function showWhatsappModal(customerName, phone, receiptText) {
-    hideSubmitLoadingOverlay();
-
-    const modal = document.getElementById('whatsappReceiptModal');
-    if (!modal) {
-        window.location.href = '/employee/dashboard.html';
-        return;
-    }
-
-    const nameEl = document.getElementById('receiptCustomerName');
-    const previewEl = document.getElementById('receiptPreviewBox');
-    const sendBtn = document.getElementById('sendWhatsappBtn');
-    const skipBtn = document.getElementById('skipWhatsappBtn');
-
-    if (nameEl) nameEl.textContent = customerName;
-    if (previewEl) previewEl.textContent = receiptText.replace(/[*_]/g, '');
-
-    modal.style.display = 'flex';
-
-    const redirectDashboard = () => {
-        modal.style.display = 'none';
-        window.location.href = '/employee/dashboard.html';
-    };
-
-    sendBtn.onclick = () => {
-        const url = `https://wa.me/${phone}?text=${encodeURIComponent(receiptText)}`;
-        window.open(url, '_blank');
-        setTimeout(redirectDashboard, 600);
-    };
-
-    skipBtn.onclick = redirectDashboard;
-}
 
 // Make toggleService available globally
 window.toggleService = toggleService;

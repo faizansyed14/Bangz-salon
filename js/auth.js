@@ -92,6 +92,10 @@ function setupStaffNavForRole(user) {
     document.querySelectorAll('a[href="expenses.html"]').forEach((el) => {
       el.style.display = 'none';
     });
+    // WhatsApp receipts are manager-only; hide the nav link for stylists.
+    document.querySelectorAll('a[href="whatsapp.html"]').forEach((el) => {
+      el.style.display = 'none';
+    });
   }
 }
 
