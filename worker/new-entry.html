@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Entry - BangzSalon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/main.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="header-logo-container">
+            <div class="bangzsalon-logo">BangzSalon</div>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="clearUser()">Logout</button>
+        </div>
+    </header>
+    
+    <nav class="nav">
+        <a href="dashboard.html" class="nav-item">Dashboard</a>
+        <a href="new-entry.html" class="nav-item active">New Entry</a>
+        <a href="calendar.html" class="nav-item">Calendar</a>
+    </nav>
+    
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Create New Transaction</h2>
+            </div>
+            
+            <form id="transactionForm">
+                <div class="form-group" style="margin-bottom: 24px;">
+                    <label for="employeeSelect">Select Employee *</label>
+                    <select id="employeeSelect" name="employeeSelect" required>
+                        <option value="">Select an employee</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; margin-bottom: 16px; font-weight: 600;">Select Services *</label>
+                    <div id="servicesGrid" class="service-grid">
+                        <div class="loading-spinner">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="selectedServices" class="selected-services" style="display: none; margin-bottom: 24px;">
+                    <h3 style="margin-bottom: 16px;">Selected Services</h3>
+                    <div id="selectedServicesList"></div>
+                    <div style="margin-top: 16px; padding-top: 16px; border-top: 2px solid var(--border);">
+                        <div class="total-row">
+                            <span>Subtotal:</span>
+                            <span id="subtotal">AED 0.00</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 24px;">
+                    <label>Payment Method *</label>
+                    <div style="display: flex; gap: 24px; margin-top: 8px;">
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="radio" name="paymentMethod" value="cash" required>
+                            <span>Cash</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="radio" name="paymentMethod" value="card" required>
+                            <span>Card</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 24px;">
+                    <label for="tips">Tips (Optional)</label>
+                    <input type="number" id="tips" name="tips" value="0">
+                </div>
+                
+                <div class="total-display">
+                    <div class="total-row">
+                        <span>Subtotal:</span>
+                        <span id="displaySubtotal">AED 0.00</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Tips:</span>
+                        <span id="displayTips">AED 0.00</span>
+                    </div>
+                    <div class="total-row">
+                        <span>Grand Total:</span>
+                        <span id="grandTotal">AED 0.00</span>
+                    </div>
+                </div>
+                
+                <div class="form-actions" style="margin-top: 24px;">
+                    <button type="submit" class="btn btn-primary btn-block">Create Entry</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="submitLoadingOverlay" class="submit-loading-overlay" style="display: none;" aria-hidden="true">
+        <div class="submit-loading-panel">
+            <div class="loading-spinner submit-loading-spinner">
+                <div class="spinner"></div>
+            </div>
+            <p class="submit-loading-title">Saving transaction</p>
+            <p class="submit-loading-sub">Opening your dashboard…</p>
+        </div>
+    </div>
+    
+    <script src="../js/supabase-config.js"></script>
+    <script src="../js/supabase-client.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/employee/new-entry.js"></script>
+</body>
+</html>
+

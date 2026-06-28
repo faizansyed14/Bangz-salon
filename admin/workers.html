@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <script src="../js/version.js"></script>
+    <title>Manage Employees - BangzSalon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/main.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="header-logo-container">
+            <div class="bangzsalon-logo">BangzSalon</div>
+        </div>
+        <nav class="nav">
+            <a href="dashboard.html" class="nav-item">Dashboard</a>
+            <a href="workers.html" class="nav-item active">Employees</a>
+            <a href="services.html" class="nav-item">Services</a>
+            <a href="calendar.html" class="nav-item">Calendar</a>
+            <a href="expenses.html" class="nav-item">Expenses</a>
+            <a href="salary.html" class="nav-item">Salary</a>
+            <div class="nav-actions">
+                <button id="themeToggle" class="theme-toggle" onclick="toggleTheme()" title="Switch to Dark Mode">🌙</button>
+                <button class="btn btn-secondary btn-block" onclick="clearUser()">Logout</button>
+            </div>
+        </nav>
+        <button class="hamburger" aria-label="Toggle navigation" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+    </header>
+    
+    <nav class="nav-mobile">
+        <div class="nav-logo">
+            <div class="bangzsalon-logo" style="font-size: 20px; padding: 0;">BangzSalon</div>
+        </div>
+        <a href="dashboard.html" class="nav-item">Dashboard</a>
+        <a href="workers.html" class="nav-item active">Employees</a>
+        <a href="services.html" class="nav-item">Services</a>
+        <a href="calendar.html" class="nav-item">Calendar</a>
+        <a href="expenses.html" class="nav-item">Expenses</a>
+        <a href="salary.html" class="nav-item">Salary</a>
+        <div class="nav-actions">
+            <button id="themeToggleMobile" class="theme-toggle" onclick="toggleTheme()" title="Switch to Dark Mode" style="width: 100%; margin-bottom: 8px;">🌙</button>
+            <button class="btn btn-secondary btn-block" onclick="clearUser()">Logout</button>
+        </div>
+    </nav>
+    <div class="nav-overlay"></div>
+    
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Create New Employee</h2>
+            </div>
+            
+            <form id="employeeForm" class="form-grid">
+                <div class="form-group">
+                    <label for="employeeName">Employee Name *</label>
+                    <input type="text" id="employeeName" name="employeeName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="employeePhone">Phone Number *</label>
+                    <input type="tel" id="employeePhone" name="employeePhone" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="employeePerPersonTarget">Sales target per customer (AED)</label>
+                    <input type="number" id="employeePerPersonTarget" name="employeePerPersonTarget" value="30" title="Service sales (subtotal) expected per customer for target progress">
+                </div>
+
+                <div class="form-group">
+                    <label for="employeeEmail">Login Email *</label>
+                    <input type="email" id="employeeEmail" name="employeeEmail" required autocomplete="off">
+                </div>
+
+                <div class="form-group">
+                    <label for="employeePassword">Login Password *</label>
+                    <input type="password" id="employeePassword" name="employeePassword" required autocomplete="new-password" minlength="6">
+                </div>
+
+                <div class="form-group">
+                    <label for="employeeRole">Role *</label>
+                    <select id="employeeRole" name="employeeRole" required>
+                        <option value="">Select role</option>
+                        <option value="manager">Manager — enter transactions, see all salon activity</option>
+                        <option value="employee">Employee (stylist) — own sales &amp; calendar only</option>
+                    </select>
+                </div>
+            </form>
+            
+            <div class="form-actions">
+                <button type="submit" form="employeeForm" class="btn btn-primary">Create Employee</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Employees List</h2>
+            </div>
+            
+            <div id="employeesList" class="employee-grid">
+                <div class="loading-spinner">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Employee</h2>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <form id="editForm">
+                <input type="hidden" id="editEmployeeId">
+                <input type="hidden" id="editUserId">
+                <div class="form-group">
+                    <label for="editEmployeeName">Employee Name *</label>
+                    <input type="text" id="editEmployeeName" required>
+                </div>
+                <div class="form-group">
+                    <label for="editEmployeePhone">Phone Number *</label>
+                    <input type="tel" id="editEmployeePhone" required>
+                </div>
+                <div class="form-group">
+                    <label for="editPerPersonTarget">Sales target per customer (AED)</label>
+                    <input type="number" id="editPerPersonTarget" title="Used for stylist daily target progress">
+                </div>
+                <div class="form-group">
+                    <label for="editEmployeeEmail">Login Email *</label>
+                    <input type="email" id="editEmployeeEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="editEmployeeRole">Role *</label>
+                    <select id="editEmployeeRole" required>
+                        <option value="manager">Manager</option>
+                        <option value="employee">Employee (stylist)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="editEmployeePassword">New Password</label>
+                    <input type="password" id="editEmployeePassword" autocomplete="new-password" minlength="6" placeholder="Leave blank to keep current">
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Update</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeEditModal()">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content modal-content-small">
+            <div class="modal-header">
+                <h2 id="confirmModalTitle">Confirm Action</h2>
+                <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmModalMessage"></p>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-primary" id="confirmModalYes">Confirm</button>
+                <button type="button" class="btn btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="../js/supabase-config.js"></script>
+    <script src="../js/supabase-client.js"></script>
+    <script src="../js/utils.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/admin/workers.js"></script>
+</body>
+</html>
+
