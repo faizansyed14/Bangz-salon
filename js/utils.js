@@ -1,141 +1,136 @@
 // Utility Functions for BangzSalon
 
 // Timezone: GST (Gulf Standard Time, UTC+4) - Asia/Dubai
+// Every calendar day, month total, and saved sale uses this zone.
+// Phone timezone (UAE, Philippines, anywhere else) must not change the numbers.
 const TIMEZONE = 'Asia/Dubai';
+const GST_OFFSET = '+04:00';
+
+function _pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+/**
+ * Dubai wall-clock parts for an instant. Does not use the phone timezone.
+ * month is 1-12.
+ */
+function getGSTParts(date = new Date()) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    hourCycle: 'h23'
+  });
+
+  const parts = formatter.formatToParts(date);
+  const pick = (type) => {
+    const part = parts.find((p) => p.type === type);
+    return part ? part.value : '0';
+  };
+
+  // Some engines report midnight as 24:00. That makes an invalid ISO string.
+  let hour = pick('hour');
+  if (hour === '24') hour = '00';
+
+  return {
+    year: Number(pick('year')),
+    month: Number(pick('month')),
+    day: Number(pick('day')),
+    hour: Number(hour),
+    minute: Number(pick('minute')),
+    second: Number(pick('second'))
+  };
+}
+
+/**
+ * Instant for a Dubai civil date. monthIndex is 0-11.
+ * Building +04:00 directly avoids new Date(y, m, d), which is phone-local midnight.
+ */
+function dateAtGST(year, monthIndex, day, hour = 0, minute = 0, second = 0, ms = 0) {
+  const iso = `${year}-${_pad2(monthIndex + 1)}-${_pad2(day)}T${_pad2(hour)}:${_pad2(minute)}:${_pad2(second)}.${String(ms).padStart(3, '0')}${GST_OFFSET}`;
+  return new Date(iso);
+}
+
+/** Noon Dubai on the Dubai day of `date`. Safe cursor for month navigation. */
+function getGSTNoon(date = new Date()) {
+  const p = getGSTParts(date);
+  return dateAtGST(p.year, p.month - 1, p.day, 12, 0, 0, 0);
+}
+
+/** Calendar key year-monthIndex-day in Dubai. monthIndex is 0-11. */
+function gstDateKey(date) {
+  const p = getGSTParts(date);
+  return `${p.year}-${p.month - 1}-${p.day}`;
+}
+
+/** Move a Dubai calendar month without local setMonth (which can skip February). */
+function shiftGSTMonth(date, delta) {
+  const p = getGSTParts(date);
+  const utc = new Date(Date.UTC(p.year, (p.month - 1) + delta, 1));
+  return dateAtGST(utc.getUTCFullYear(), utc.getUTCMonth(), 1, 12, 0, 0, 0);
+}
 
 /**
  * Get current date/time in GST (for display purposes)
  */
 function getGSTDate(date = new Date()) {
-  // Use Intl API for proper timezone conversion
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'Asia/Dubai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
-  
-  const parts = formatter.formatToParts(date);
-  const year = parts.find(p => p.type === 'year').value;
-  const month = parts.find(p => p.type === 'month').value;
-  const day = parts.find(p => p.type === 'day').value;
-  const hour = parts.find(p => p.type === 'hour').value;
-  const minute = parts.find(p => p.type === 'minute').value;
-  const second = parts.find(p => p.type === 'second').value;
-  
-  // Create date in GST (UTC+4)
-  return new Date(`${year}-${month}-${day}T${hour}:${minute}:${second}+04:00`);
+  const p = getGSTParts(date);
+  return dateAtGST(p.year, p.month - 1, p.day, p.hour, p.minute, p.second, 0);
 }
 
 /**
  * Get current GST time as UTC ISO string (for database storage)
- * This ensures the transaction_date stored in DB represents the correct GST time
+ * A sale at 00:01 Dubai is stored on the new Dubai date, on every phone.
  */
 function getCurrentGSTAsUTC() {
-  // Get current time components in GST
-  const now = new Date();
-  const gstDateStr = now.toLocaleString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  });
-  
-  // Parse: format is "MM/DD/YYYY, HH:MM:SS"
-  const [datePart, timePart] = gstDateStr.split(', ');
-  const [month, day, year] = datePart.split('/');
-  const [hour, minute, second] = timePart.split(':');
-  
-  // Create date string in GST (UTC+4)
-  const gstISOString = `${year}-${month}-${day}T${hour}:${minute}:${second}+04:00`;
-  
-  // Convert to UTC ISO string (this is what we store in DB)
-  const gstDate = new Date(gstISOString);
-  return gstDate.toISOString();
+  const p = getGSTParts(new Date());
+  return dateAtGST(p.year, p.month - 1, p.day, p.hour, p.minute, p.second, 0).toISOString();
 }
 
 /**
- * Get start of day in GST (returns ISO string for database queries)
- * Simple and robust: Create date string in GST, then convert to UTC
+ * Start of the Dubai day that contains `date` (00:00:00.000 GST).
  */
 function getStartOfDay(date = new Date()) {
-  // Get date string in GST timezone
-  const gstDateStr = date.toLocaleString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
-  
-  // Parse: format is "MM/DD/YYYY"
-  const [month, day, year] = gstDateStr.split('/');
-  
-  // Create date at 00:00:00 in GST (UTC+4)
-  // This automatically converts to UTC when we call toISOString()
-  const gstDate = new Date(`${year}-${month}-${day}T00:00:00+04:00`);
-  
-  return gstDate;
+  const p = getGSTParts(date);
+  return dateAtGST(p.year, p.month - 1, p.day, 0, 0, 0, 0);
 }
 
 /**
- * Get end of day in GST (returns ISO string for database queries)
+ * End of the Dubai day that contains `date` (23:59:59.999 GST).
  */
 function getEndOfDay(date = new Date()) {
-  // Get date string in GST timezone
-  const gstDateStr = date.toLocaleString('en-US', { 
-    timeZone: 'Asia/Dubai',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
-  
-  // Parse: format is "MM/DD/YYYY"
-  const [month, day, year] = gstDateStr.split('/');
-  
-  // Create date at 23:59:59.999 in GST (UTC+4)
-  const gstDate = new Date(`${year}-${month}-${day}T23:59:59.999+04:00`);
-  
-  return gstDate;
+  const p = getGSTParts(date);
+  return dateAtGST(p.year, p.month - 1, p.day, 23, 59, 59, 999);
 }
 
 /**
- * Get start of month in GST (returns Date object in UTC for database queries)
- * This ensures we capture all transactions from the first moment of the month in GST
+ * Start of a Dubai month. month is 0-indexed (0=Jan, 11=Dec).
+ * 1st 00:00:00 GST, not phone-local midnight.
  */
 function getStartOfMonth(year, month) {
-  // Create date for first day of month
-  // Note: month is 0-indexed in JavaScript (0=Jan, 11=Dec)
-  const date = new Date(year, month, 1);
-  return getStartOfDay(date);
+  return dateAtGST(year, month, 1, 0, 0, 0, 0);
 }
 
 /**
- * Get end of month in GST (returns Date object in UTC for database queries)
- * This ensures we capture all transactions up to the last moment of the month in GST
+ * End of a Dubai month. month is 0-indexed.
+ * Last day 23:59:59.999 GST. A sale at 00:01 on the 1st belongs to the new month.
  */
 function getEndOfMonth(year, month) {
-  // Create date for last day of month (month + 1, day 0 = last day of previous month)
-  const date = new Date(year, month + 1, 0);
-  return getEndOfDay(date);
+  const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return dateAtGST(year, month, lastDay, 23, 59, 59, 999);
 }
 
 /**
- * Format date as DD/MM/YYYY
+ * Format date as DD/MM/YYYY in Dubai, ignoring the phone timezone.
  */
 function formatDate(date) {
-  const d = getGSTDate(new Date(date));
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  const p = getGSTParts(date instanceof Date ? date : new Date(date));
+  return `${_pad2(p.day)}/${_pad2(p.month)}/${p.year}`;
 }
 
 /**
@@ -312,15 +307,14 @@ function getMonthName(monthIndex) {
  * Get days in month
  */
 function getDaysInMonth(year, month) {
-  return new Date(year, month + 1, 0).getDate();
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
 /**
- * Get first day of month (0 = Sunday, 1 = Monday, etc.)
+ * Weekday of the 1st (0 = Sunday). Gregorian weekday, not the phone timezone.
  */
 function getFirstDayOfMonth(year, month) {
-  const date = new Date(year, month, 1);
-  return date.getDay();
+  return new Date(Date.UTC(year, month, 1)).getUTCDay();
 }
 
 /**

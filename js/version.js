@@ -1,6 +1,6 @@
 // Global versioning helper for cache busting
 // Update APP_VERSION once per deploy; all local CSS/JS will reload with this stamp.
-const APP_VERSION = '1.0.7';
+const APP_VERSION = '1.0.8';
 
 const versionAsset = (url) => {
     if (!url || /^https?:\/\//i.test(url)) return url; // skip external/CDN

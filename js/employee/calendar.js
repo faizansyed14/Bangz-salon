@@ -12,7 +12,7 @@ if (isStylistOnly && !user.employee_id) {
     console.warn('Stylist account missing employee_id:', user.email);
 }
 
-let currentDate = new Date();
+let currentDate = getGSTNoon();
 let selectedDate = null;
 let transactionCounts = {};
 
@@ -120,39 +120,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
 async function loadTransactionCounts() {
     try {
-        const year = currentDate.getFullYear();
-        const monthIndex = currentDate.getMonth();
+        const gstCursor = getGSTParts(currentDate);
+        const year = gstCursor.year;
+        const monthIndex = gstCursor.month - 1;
 
-        const monthStartDate = new Date(year, monthIndex, 1);
-        const monthEndDate = new Date(year, monthIndex + 1, 0);
-
-        const monthStartGST = getStartOfDay(monthStartDate);
-        const monthEndGST = getEndOfDay(monthEndDate);
+        const monthStartGST = getStartOfMonth(year, monthIndex);
+        const monthEndGST = getEndOfMonth(year, monthIndex);
 
         const startISO = monthStartGST.toISOString();
         const endISO = monthEndGST.toISOString();
 
-        let q = window.supabaseClient
-            .from('transactions')
-            .select('transaction_date')
-            .gte('transaction_date', startISO)
-            .lte('transaction_date', endISO);
-
-        q = applyEmployeeScope(q);
-
-        const { data: transactions, error } = await q;
-
-        if (error) {
-            console.error('Error loading transaction counts:', error);
-            throw error;
+        const pageSize = 1000;
+        const transactions = [];
+        for (let from = 0; ; from += pageSize) {
+            let q = window.supabaseClient
+                .from('transactions')
+                .select('transaction_date')
+                .gte('transaction_date', startISO)
+                .lte('transaction_date', endISO)
+                .range(from, from + pageSize - 1);
+            q = applyEmployeeScope(q);
+            const { data: page, error } = await q;
+            if (error) {
+                console.error('Error loading transaction counts:', error);
+                throw error;
+            }
+            if (page && page.length) transactions.push(...page);
+            if (!page || page.length < pageSize) break;
         }
 
         transactionCounts = {};
         if (transactions && transactions.length > 0) {
             transactions.forEach((transaction) => {
-                const utcDate = new Date(transaction.transaction_date);
-                const gstDate = getGSTDate(utcDate);
-                const dateKey = `${gstDate.getFullYear()}-${gstDate.getMonth()}-${gstDate.getDate()}`;
+                const dateKey = gstDateKey(new Date(transaction.transaction_date));
                 transactionCounts[dateKey] = (transactionCounts[dateKey] || 0) + 1;
             });
         }
@@ -165,8 +165,9 @@ async function loadTransactionCounts() {
 }
 
 function renderCalendar() {
-    const year = currentDate.getFullYear();
-    const monthIndex = currentDate.getMonth();
+    const gstCursor = getGSTParts(currentDate);
+    const year = gstCursor.year;
+    const monthIndex = gstCursor.month - 1;
 
     const headerEl = document.getElementById('calendarMonthYear');
     if (headerEl) {
@@ -186,8 +187,8 @@ function renderCalendar() {
 
     const firstDay = getFirstDayOfMonth(year, monthIndex);
     const daysInMonth = getDaysInMonth(year, monthIndex);
-    const today = new Date();
-    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === monthIndex;
+    const todayGST = getGSTParts(new Date());
+    const isCurrentMonth = todayGST.year === year && (todayGST.month - 1) === monthIndex;
 
     for (let i = 0; i < firstDay; i++) {
         const emptyDay = document.createElement('div');
@@ -200,7 +201,7 @@ function renderCalendar() {
         dayElement.className = 'calendar-day';
 
         const dateKey = `${year}-${monthIndex}-${day}`;
-        const isToday = isCurrentMonth && day === today.getDate();
+        const isToday = isCurrentMonth && day === todayGST.day;
         const hasTransactions = transactionCounts[dateKey] > 0;
 
         if (isToday) {
@@ -213,7 +214,7 @@ function renderCalendar() {
         `;
 
         dayElement.addEventListener('click', () => {
-            const clickedDate = new Date(year, monthIndex, day);
+            const clickedDate = dateAtGST(year, monthIndex, day, 12, 0, 0, 0);
             document.querySelectorAll('.calendar-day.selected').forEach((d) => d.classList.remove('selected'));
             dayElement.classList.add('selected');
             selectDate(clickedDate);
@@ -381,36 +382,38 @@ async function showMonthlyView() {
     if (!selectedDate) return;
 
     try {
-        const year = selectedDate.getFullYear();
-        const monthIndex = selectedDate.getMonth();
+        const gstSelected = getGSTParts(selectedDate);
+        const year = gstSelected.year;
+        const monthIndex = gstSelected.month - 1;
 
-        const startDate = new Date(year, monthIndex, 1);
-        const endDate = new Date(year, monthIndex + 1, 0);
-
-        const monthStartGST = getStartOfDay(startDate);
-        const monthEndGST = getEndOfDay(endDate);
+        const monthStartGST = getStartOfMonth(year, monthIndex);
+        const monthEndGST = getEndOfMonth(year, monthIndex);
 
         const startISO = monthStartGST.toISOString();
         const endISO = monthEndGST.toISOString();
 
-        let q = window.supabaseClient
-            .from('transactions')
-            .select(
-                `
+        const pageSize = 1000;
+        const transactions = [];
+        for (let from = 0; ; from += pageSize) {
+            let q = window.supabaseClient
+                .from('transactions')
+                .select(
+                    `
                 *,
                 employees(name),
                 transaction_items(service_name, price, quantity)
             `
-            )
-            .gte('transaction_date', startISO)
-            .lte('transaction_date', endISO)
-            .order('transaction_date', { ascending: false });
-
-        q = applyEmployeeScope(q);
-
-        const { data: transactions, error } = await q;
-
-        if (error) throw error;
+                )
+                .gte('transaction_date', startISO)
+                .lte('transaction_date', endISO)
+                .order('transaction_date', { ascending: false })
+                .range(from, from + pageSize - 1);
+            q = applyEmployeeScope(q);
+            const { data: page, error } = await q;
+            if (error) throw error;
+            if (page && page.length) transactions.push(...page);
+            if (!page || page.length < pageSize) break;
+        }
 
         document.getElementById('dateDetailsTitle').textContent = `Month: ${getMonthName(monthIndex)} ${year}`;
 
@@ -529,17 +532,17 @@ async function showMonthlyView() {
 }
 
 function previousMonth() {
-    currentDate.setMonth(currentDate.getMonth() - 1);
+    currentDate = shiftGSTMonth(currentDate, -1);
     loadTransactionCounts();
 }
 
 function nextMonth() {
-    currentDate.setMonth(currentDate.getMonth() + 1);
+    currentDate = shiftGSTMonth(currentDate, 1);
     loadTransactionCounts();
 }
 
 function goToToday() {
-    currentDate = new Date();
+    currentDate = getGSTNoon();
     loadTransactionCounts();
 }
 

@@ -83,8 +83,7 @@ async function loadRecentExpenses() {
         '<tr><td colspan="3" style="text-align:center;padding:24px;color:var(--text-secondary);">Loading…</td></tr>';
 
     try {
-        const since = new Date();
-        since.setDate(since.getDate() - 60);
+        const since = new Date(getStartOfDay(new Date()).getTime() - 60 * 24 * 60 * 60 * 1000);
         const startISO = getStartOfDay(since).toISOString();
 
         const { data, error } = await window.supabaseClient

@@ -12,16 +12,12 @@ let refreshInterval;
 // Load monthly data
 async function loadMonthlyData() {
     try {
-        const today = new Date();
-        const year = today.getFullYear();
-        const monthIndex = today.getMonth();
-        
-        // Create start and end of month dates
-        const startDate = new Date(year, monthIndex, 1);
-        const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
-        
-        const monthStart = getStartOfDay(startDate);
-        const monthEnd = getEndOfDay(endDate);
+        const gstNow = getGSTParts(new Date());
+        const year = gstNow.year;
+        const monthIndex = gstNow.month - 1;
+
+        const monthStart = getStartOfMonth(year, monthIndex);
+        const monthEnd = getEndOfMonth(year, monthIndex);
         
         const startISO = monthStart.toISOString();
         const endISO = monthEnd.toISOString();
@@ -276,12 +272,12 @@ async function loadTodayData() {
             console.log('Last 10 transactions in DB:', allRecent);
             allRecent.forEach(t => {
                 const dbDate = new Date(t.transaction_date);
-                const gstDate = getGSTDate(dbDate);
-                const todayGST = getGSTDate(new Date());
-                const isToday = gstDate.getDate() === todayGST.getDate() && 
-                               gstDate.getMonth() === todayGST.getMonth() && 
-                               gstDate.getFullYear() === todayGST.getFullYear();
-                console.log(`Transaction ${t.id}: DB date = ${t.transaction_date}, GST date = ${gstDate.toLocaleString()}, Is today = ${isToday}`);
+                const gstDate = getGSTParts(dbDate);
+                const todayGST = getGSTParts(new Date());
+                const isToday = gstDate.day === todayGST.day &&
+                               gstDate.month === todayGST.month &&
+                               gstDate.year === todayGST.year;
+                console.log(`Transaction ${t.id}: DB date = ${t.transaction_date}, GST date = ${gstDate.year}-${gstDate.month}-${gstDate.day}, Is today = ${isToday}`);
             });
         }
         

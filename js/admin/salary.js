@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // Setup year dropdown
 function setupYearDropdown() {
     const yearSelect = document.getElementById('yearSelect');
-    const currentYear = new Date().getFullYear();
+    const currentYear = getGSTParts(new Date()).year;
     
     // Add current year and previous 5 years
     for (let i = 0; i < 6; i++) {
@@ -40,7 +40,7 @@ function setupYearDropdown() {
 // Setup month dropdown
 function setupMonthDropdown() {
     const monthSelect = document.getElementById('monthSelect');
-    const currentMonth = new Date().getMonth();
+    const currentMonth = getGSTParts(new Date()).month - 1;
     
     // Set current month as default
     monthSelect.value = currentMonth;
@@ -91,12 +91,8 @@ async function loadSalaryData() {
             </tr>
         `;
         
-        // Create start and end of month dates
-        const startDate = new Date(selectedYear, selectedMonth, 1);
-        const endDate = new Date(selectedYear, selectedMonth + 1, 0); // Last day of month
-        
-        const monthStart = getStartOfDay(startDate);
-        const monthEnd = getEndOfDay(endDate);
+        const monthStart = getStartOfMonth(selectedYear, selectedMonth);
+        const monthEnd = getEndOfMonth(selectedYear, selectedMonth);
         
         const startISO = monthStart.toISOString();
         const endISO = monthEnd.toISOString();

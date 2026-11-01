@@ -7,7 +7,7 @@ if (!user) {
     throw new Error('Unauthorized');
 }
 
-let currentDate = new Date();
+let currentDate = getGSTNoon();
 let selectedDate = null;
 let transactionCounts = {};
 
@@ -20,15 +20,12 @@ document.addEventListener('DOMContentLoaded', () => {
 // Load transaction counts for the current month
 async function loadTransactionCounts() {
     try {
-        const year = currentDate.getFullYear();
-        const monthIndex = currentDate.getMonth();
-        
-        // Create start and end of month dates in GST
-        const monthStartDate = new Date(year, monthIndex, 1);
-        const monthEndDate = new Date(year, monthIndex + 1, 0); // Last day of month
-        
-        const monthStartGST = getStartOfDay(monthStartDate);
-        const monthEndGST = getEndOfDay(monthEndDate);
+        const gstCursor = getGSTParts(currentDate);
+        const year = gstCursor.year;
+        const monthIndex = gstCursor.month - 1;
+
+        const monthStartGST = getStartOfMonth(year, monthIndex);
+        const monthEndGST = getEndOfMonth(year, monthIndex);
         
         const startISO = monthStartGST.toISOString();
         const endISO = monthEndGST.toISOString();
@@ -60,11 +57,7 @@ async function loadTransactionCounts() {
         transactionCounts = {};
         allMonthTransactions.forEach(transaction => {
             // Convert UTC timestamp to GST date
-            const utcDate = new Date(transaction.transaction_date);
-            const gstDate = getGSTDate(utcDate);
-            
-            // Create date key: year-month-day (month is 0-indexed in JS)
-            const dateKey = `${gstDate.getFullYear()}-${gstDate.getMonth()}-${gstDate.getDate()}`;
+            const dateKey = gstDateKey(new Date(transaction.transaction_date));
             transactionCounts[dateKey] = (transactionCounts[dateKey] || 0) + 1;
         });
 
@@ -79,8 +72,9 @@ async function loadTransactionCounts() {
 
 // Render calendar
 function renderCalendar() {
-    const year = currentDate.getFullYear();
-    const monthIndex = currentDate.getMonth();
+    const gstCursor = getGSTParts(currentDate);
+    const year = gstCursor.year;
+    const monthIndex = gstCursor.month - 1;
     
     // Update month/year header
     document.getElementById('calendarMonthYear').textContent = `${getMonthName(monthIndex)} ${year}`;
@@ -100,8 +94,8 @@ function renderCalendar() {
     // Get first day of month and days in month
     const firstDay = getFirstDayOfMonth(year, monthIndex);
     const daysInMonth = getDaysInMonth(year, monthIndex);
-    const today = new Date();
-    const isCurrentMonth = today.getFullYear() === year && today.getMonth() === monthIndex;
+    const todayGST = getGSTParts(new Date());
+    const isCurrentMonth = todayGST.year === year && (todayGST.month - 1) === monthIndex;
     
     // Empty cells for days before month starts
     for (let i = 0; i < firstDay; i++) {
@@ -118,7 +112,7 @@ function renderCalendar() {
         // Create date key matching the format used in loadTransactionCounts
         // Note: monthIndex is 0-indexed in JavaScript
         const dateKey = `${year}-${monthIndex}-${day}`;
-        const isToday = isCurrentMonth && day === today.getDate();
+        const isToday = isCurrentMonth && day === todayGST.day;
         const hasTransactions = transactionCounts[dateKey] > 0;
         
         // Debug log for first few days
@@ -136,7 +130,7 @@ function renderCalendar() {
         `;
         
         dayElement.addEventListener('click', () => {
-            const clickedDate = new Date(year, monthIndex, day);
+            const clickedDate = dateAtGST(year, monthIndex, day, 12, 0, 0, 0);
             // Remove selected class from all days
             document.querySelectorAll('.calendar-day.selected').forEach(d => d.classList.remove('selected'));
             // Add selected class to clicked day
@@ -402,15 +396,12 @@ async function showMonthlyView() {
     if (!selectedDate) return;
     
     try {
-        const year = selectedDate.getFullYear();
-        const monthIndex = selectedDate.getMonth();
-        
-        // Create start and end of month dates
-        const startDate = new Date(year, monthIndex, 1);
-        const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
-        
-        const monthStart = getStartOfDay(startDate);
-        const monthEnd = getEndOfDay(endDate);
+        const gstSelected = getGSTParts(selectedDate);
+        const year = gstSelected.year;
+        const monthIndex = gstSelected.month - 1;
+
+        const monthStart = getStartOfMonth(year, monthIndex);
+        const monthEnd = getEndOfMonth(year, monthIndex);
         
         const startISO = monthStart.toISOString();
         const endISO = monthEnd.toISOString();
@@ -579,17 +570,17 @@ async function showMonthlyView() {
 
 // Navigation functions
 function previousMonth() {
-    currentDate.setMonth(currentDate.getMonth() - 1);
+    currentDate = shiftGSTMonth(currentDate, -1);
     loadTransactionCounts();
 }
 
 function nextMonth() {
-    currentDate.setMonth(currentDate.getMonth() + 1);
+    currentDate = shiftGSTMonth(currentDate, 1);
     loadTransactionCounts();
 }
 
 function goToToday() {
-    currentDate = new Date();
+    currentDate = getGSTNoon();
     loadTransactionCounts();
 }
 
