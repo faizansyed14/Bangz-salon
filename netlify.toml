@@ -1,6 +1,11 @@
 [build]
   publish = "."
   command = "node scripts/generate-supabase-config.js"
+
+# URL and anon key are public client config. They must be in the browser file.
+# Gmail credentials stay scanned.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_ANON_KEY,SUPABASE_URL"
   
 [[redirects]]
   from = "/*"
